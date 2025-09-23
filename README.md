@@ -10,62 +10,62 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              AutoSD Host System                                 │
 │                                                                                 │
-│  ┌───────────────────────────────────┐    ┌─────────────────────────────────────┐│
-│  │         Main Partition            │    │          QM Partition               ││
+│  ┌───────────────────────────────────┐    ┌────────────────────────────────────┐│
+│  │         Main Partition            │    │          QM Partition              ││
 │  │      (Safety Critical)            │    │    (Quality Managed/Non-Safety)    ││
-│  │         ASIL Processes            │    │                                     ││
-│  │                                   │    │                                     ││
-│  │  ┌─────────────────────────────┐  │    │  ┌─────────────────────────────┐    ││
-│  │  │     holden-controller       │  │    │  │       holden-agent         │    ││
-│  │  │   ┌─────────────────────┐   │  │    │  │     ┌─────────────────┐     │    ││
-│  │  │   │ CLI Commands:       │   │  │    │  │     │ Process Manager │     │    ││
-│  │  │   │ • start <cmd>       │   │  │    │  │     │ • Fork/Exec     │     │    ││
-│  │  │   │ • stop <pid>        │   │  │    │  │     │ • Monitor       │     │    ││
-│  │  │   │ • list              │   │  │    │  │     │ • cgroups       │     │    ││
-│  │  │   │ • constrain         │   │  │    │  │     │ • Cleanup       │     │    ││
-│  │  │   └─────────────────────┘   │  │    │  │     └─────────────────┘     │    ││
-│  │  └─────────────────────────────┘  │    │  └─────────────────────────────┘    ││
-│  │                │                  │    │                │                    ││
-│  │  ┌─────────────────────────────┐  │    │  ┌─────────────────────────────┐    ││
-│  │  │     holden-monitor          │  │    │  │       systemd               │    ││
-│  │  │   (Real-time monitoring)    │  │    │  │   ┌─────────────────────┐   │    ││
-│  │  └─────────────────────────────┘  │    │  │   │ holden-agent.service│   │    ││
-│  │                │                  │    │  │   │ • Auto-start        │   │    ││
-│  │                │                  │    │  │   │ • Restart on fail   │   │    ││
-│  └────────────────┼──────────────────┘    │  │   │ • Security sandbox  │   │    ││
-│                   │                       │  │   └─────────────────────┘   │    ││
-│                   │                       │  └─────────────────────────────┘    ││
-│                   │                       │                │                    ││
-│                   │    ┌─────────────────────────────────────┘                 ││
-│                   │    │                  │                                     ││
-│                   │    │                  │  ┌─────────────────────────────┐    ││
-│                   │    │                  │  │   Non-Safety Processes      │    ││
-│                   │    │                  │  │  ┌─────┐ ┌─────┐ ┌─────┐     │    ││
-│                   │    │                  │  │  │ PID │ │ PID │ │ PID │     │    ││
-│                   │    │                  │  │  │ 123 │ │ 456 │ │ 789 │     │    ││
-│                   │    │                  │  │  └─────┘ └─────┘ └─────┘     │    ││
-│                   │    │                  │  │    ↓       ↓       ↓         │    ││
-│                   │    │                  │  │ [cgroups constraints]        │    ││
-│                   │    │                  │  └─────────────────────────────┘    ││
-│                   │    │                  │                                     ││
-│  ┌────────────────▼────▼──────────────────▼─────────────────────────────────────┤│
-│  │                     /run/holden (Shared Directory)                         ││
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   ││
-│  │  │                qm_orchestrator.sock                                 │   ││
-│  │  │              (Unix Domain Socket)                                   │   ││
-│  │  │                                                                     │   ││
-│  │  │  Protocol Messages:                                                 │   ││
-│  │  │  • MSG_START_PROCESS  ←→  MSG_PROCESS_STARTED                       │   ││
-│  │  │  • MSG_STOP_PROCESS   ←→  MSG_PROCESS_STOPPED                       │   ││
-│  │  │  • MSG_LIST_PROCESSES ←→  MSG_PROCESS_LIST                          │   ││
-│  │  │  • MSG_APPLY_CONSTRAINTS ←→ MSG_CONSTRAINTS_APPLIED                 │   ││
-│  │  └─────────────────────────────────────────────────────────────────────┘   ││
-│  └─────────────────────────────────────────────────────────────────────────────┤│
+│  │         ASIL Processes            │    │                                    ││
+│  │                                   │    │                                    ││
+│  │  ┌─────────────────────────────┐  │    │  ┌─────────────────────────────┐   ││
+│  │  │     holden-controller       │  │    │  │       holden-agent          │   ││
+│  │  │   ┌─────────────────────┐   │  │    │  │     ┌─────────────────┐     │   ││
+│  │  │   │ CLI Commands:       │   │  │    │  │     │ Process Manager │     │   ││
+│  │  │   │ • start <cmd>       │   │  │    │  │     │ • Fork/Exec     │     │   ││
+│  │  │   │ • stop <pid>        │   │  │    │  │     │ • Monitor       │     │   ││
+│  │  │   │ • list              │   │  │    │  │     │ • cgroups       │     │   ││
+│  │  │   │ • constrain         │   │  │    │  │     │ • Cleanup       │     │   ││
+│  │  │   └─────────────────────┘   │  │    │  │     └─────────────────┘     │   ││
+│  │  └─────────────────────────────┘  │    │  └─────────────────────────────┘   ││
+│  │                │                  │    │                │                   ││
+│  │  ┌─────────────────────────────┐  │    │  ┌─────────────────────────────┐   ││
+│  │  │     holden-monitor          │  │    │  │       systemd               │   ││
+│  │  │   (Real-time monitoring)    │  │    │  │   ┌─────────────────────┐   │   ││
+│  │  └─────────────────────────────┘  │    │  │   │ holden-agent.service│   │   ││
+│  │                │                  │    │  │   │ • Auto-start        │   │   ││
+│  │                │                  │    │  │   │ • Restart on fail   │   │   ││
+│  └────────────────┼──────────────────┘    │  │   │ • Security sandbox  │   │   ││
+│                   │                       │  │   └─────────────────────┘   │   ││
+│                   │                       │  └─────────────────────────────┘   ││
+│                   │                       │                │                   ││
+│                   │    ┌───────────────────────────────────┘                   ││
+│                   │    │                  │                                    ││
+│                   │    │                  │  ┌─────────────────────────────┐   ││
+│                   │    │                  │  │   Non-Safety Processes      │   ││
+│                   │    │                  │  │  ┌─────┐ ┌─────┐ ┌─────┐    │   ││
+│                   │    │                  │  │  │ PID │ │ PID │ │ PID │    │   ││
+│                   │    │                  │  │  │ 123 │ │ 456 │ │ 789 │    │   ││
+│                   │    │                  │  │  └─────┘ └─────┘ └─────┘    │   ││
+│                   │    │                  │  │    ↓       ↓       ↓        │   ││
+│                   │    │                  │  │ [cgroups constraints]       │   ││
+│                   │    │                  │  └─────────────────────────────┘   ││
+│                   │    │                  │                                    ││
+│  ┌────────────────▼────▼──────────────────▼────────────────────────────────────┤│
+│  │                     /run/holden (Shared Directory)                          ││
+│  │  ┌─────────────────────────────────────────────────────────────────────┐    ││
+│  │  │                qm_orchestrator.sock                                 │    ││
+│  │  │              (Unix Domain Socket)                                   │    ││
+│  │  │                                                                     │    ││
+│  │  │  Protocol Messages:                                                 │    ││
+│  │  │  • MSG_START_PROCESS  ←→  MSG_PROCESS_STARTED                       │    ││
+│  │  │  • MSG_STOP_PROCESS   ←→  MSG_PROCESS_STOPPED                       │    ││
+│  │  │  • MSG_LIST_PROCESSES ←→  MSG_PROCESS_LIST                          │    ││
+│  │  │  • MSG_APPLY_CONSTRAINTS ←→ MSG_CONSTRAINTS_APPLIED                 │    ││
+│  │  └─────────────────────────────────────────────────────────────────────┘    ││
+│  └─────────────────────────────────────────────────────────────────────────────┘│
 │                                                                                 │
-│  Configuration Files:                                                          │
-│  • /usr/lib/tmpfiles.d/holden_ipc.conf (creates shared directory)             │
-│  • /etc/containers/systemd/qm.container.d/10-holden-ipc.conf (mounts volume)  │
-│  • /usr/lib/qm/rootfs/etc/holden/agent.conf (agent configuration)             │
+│  Configuration Files:                                                           │
+│  • /usr/lib/tmpfiles.d/holden_ipc.conf (creates shared directory)               │
+│  • /etc/containers/systemd/qm.container.d/10-holden-ipc.conf (mounts volume)    │
+│  • /usr/lib/qm/rootfs/etc/holden/agent.conf (agent configuration)               │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 Data Flow:
