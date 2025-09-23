@@ -1,8 +1,8 @@
 # Holden Process Orchestration Demo for AutoSD
 
-This demo showcases the **Holden Process Orchestration System** in an AutoSD (Automotive Safety Distribution) environment, demonstrating how a controller running on the host partition can manage processes within the QM (Quality Management) partition.
+This demo showcases the **Holden Process Orchestration System v0.2** in an AutoSD (Automotive Safety Distribution) environment, demonstrating how a pidfd-based monitor running on the host partition can manage processes within the QM (Quality Management) partition using the stateless agent.
 
-Named after 19th century puppeteer Joseph Holden, this system provides precise control over process lifecycles in safety-critical automotive environments.
+Named after 19th century puppeteer Joseph Holden, this system provides precise control over process lifecycles in safety-critical automotive environments using modern Linux pidfd technology.
 
 ## Architecture Overview
 
@@ -16,20 +16,20 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 │  │         ASIL Processes            │    │                                    ││
 │  │                                   │    │                                    ││
 │  │  ┌─────────────────────────────┐  │    │  ┌─────────────────────────────┐   ││
-│  │  │     holden-controller       │  │    │  │       holden-agent          │   ││
+│  │  │    holden-pidfd-monitor     │  │    │  │       holden-agent          │   ││
 │  │  │   ┌─────────────────────┐   │  │    │  │     ┌─────────────────┐     │   ││
-│  │  │   │ CLI Commands:       │   │  │    │  │     │ Process Manager │     │   ││
-│  │  │   │ • start <cmd>       │   │  │    │  │     │ • Fork/Exec     │     │   ││
-│  │  │   │ • stop <pid>        │   │  │    │  │     │ • Monitor       │     │   ││
-│  │  │   │ • list              │   │  │    │  │     │ • cgroups       │     │   ││
-│  │  │   │ • constrain         │   │  │    │  │     │ • Cleanup       │     │   ││
+│  │  │   │ pidfd Management:   │   │  │    │  │     │ Stateless Spawn │     │   ││
+│  │  │   │ • Poll pidfds       │   │  │    │  │     │ • fork() + exec │     │   ││
+│  │  │   │ • Detect deaths     │   │  │    │  │     │ • pidfd_open()  │     │   ││
+│  │  │   │ • Auto restart      │   │  │    │  │     │ • fd passing    │     │   ││
+│  │  │   │ • Process control   │   │  │    │  │     │ • No state      │     │   ││
 │  │  │   └─────────────────────┘   │  │    │  │     └─────────────────┘     │   ││
 │  │  └─────────────────────────────┘  │    │  └─────────────────────────────┘   ││
 │  │                │                  │    │                │                   ││
-│  │  ┌─────────────────────────────┐  │    │  ┌─────────────────────────────┐   ││
-│  │  │     holden-monitor          │  │    │  │       systemd               │   ││
-│  │  │   (Real-time monitoring)    │  │    │  │   ┌─────────────────────┐   │   ││
-│  │  └─────────────────────────────┘  │    │  │   │ holden-agent.service│   │   ││
+│  │                │                  │    │  ┌─────────────────────────────┐   ││
+│  │                │                  │    │  │       systemd               │   ││
+│  │                │                  │    │  │   ┌─────────────────────┐   │   ││
+│  │                │                  │    │  │   │ holden-agent.service│   │   ││
 │  │                │                  │    │  │   │ • Auto-start        │   │   ││
 │  │                │                  │    │  │   │ • Restart on fail   │   │   ││
 │  └────────────────┼──────────────────┘    │  │   │ • Security sandbox  │   │   ││
@@ -44,241 +44,119 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 │                   │    │                  │  │  │ PID │ │ PID │ │ PID │    │   ││
 │                   │    │                  │  │  │ 123 │ │ 456 │ │ 789 │    │   ││
 │                   │    │                  │  │  └─────┘ └─────┘ └─────┘    │   ││
-│                   │    │                  │  │    ↓       ↓       ↓        │   ││
-│                   │    │                  │  │ [cgroups constraints]       │   ││
+│                   │    │                  │  │    ↑       ↑       ↑        │   ││
+│                   │    │                  │  │ [pidfd monitoring]          │   ││
 │                   │    │                  │  └─────────────────────────────┘   ││
 │                   │    │                  │                                    ││
-│  ┌────────────────▼────▼──────────────────▼────────────────────────────────────┤│
-│  │                     /run/holden (Shared Directory)                          ││
-│  │  ┌─────────────────────────────────────────────────────────────────────┐    ││
-│  │  │                qm_orchestrator.sock                                 │    ││
-│  │  │              (Unix Domain Socket)                                   │    ││
-│  │  │                                                                     │    ││
-│  │  │  Protocol Messages:                                                 │    ││
-│  │  │  • MSG_START_PROCESS  ←→  MSG_PROCESS_STARTED                       │    ││
-│  │  │  • MSG_STOP_PROCESS   ←→  MSG_PROCESS_STOPPED                       │    ││
-│  │  │  • MSG_LIST_PROCESSES ←→  MSG_PROCESS_LIST                          │    ││
-│  │  │  • MSG_APPLY_CONSTRAINTS ←→ MSG_CONSTRAINTS_APPLIED                 │    ││
-│  │  └─────────────────────────────────────────────────────────────────────┘    ││
-│  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                                                                 │
-│  Configuration Files:                                                           │
-│  • /usr/lib/tmpfiles.d/holden_ipc.conf (creates shared directory)               │
-│  • /etc/containers/systemd/qm.container.d/10-holden-ipc.conf (mounts volume)    │
-│  • /usr/lib/qm/rootfs/etc/holden/agent.conf (agent configuration)               │
+│                   │    └──────────────────┘                                    ││
+│                   │                                                            ││
+│                   └─── Unix Socket + fd passing ─────────────────────────────────┤
+│                        /run/holden/qm_orchestrator.sock                        │
 └─────────────────────────────────────────────────────────────────────────────────┘
-
-Data Flow:
-1. User runs: HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller start sleep 30
-2. Controller (safety-critical partition) connects to Unix socket
-3. Agent (QM partition) receives command, forks non-safety process
-4. Agent applies cgroups constraints (memory/CPU limits)
-5. Agent responds with process PID
-6. Safety-critical controller can monitor, constrain, or stop QM processes
 ```
 
 ## Key Components
 
-### Main Partition
-- **holden-controller**: CLI tool for process orchestration
-- **holden-monitor**: Process monitoring utility
-- **Shared IPC Directory**: `/run/holden` (mounted into QM partition)
+### 1. Stateless Agent (QM Partition)
+- **No state management**: Agent doesn't track processes
+- **Process spawning**: Uses fork() + exec() with container context inheritance
+- **pidfd creation**: Calls pidfd_open() for each spawned process
+- **fd passing**: Returns pidfd to caller via Unix socket
+- **Immediate cleanup**: Agent closes pidfd after passing it
 
-### QM Partition
-- **holden-agent**: Daemon that manages processes (runs as systemd service)
-- **Socket**: `/run/holden/qm_orchestrator.sock` (accessible from host)
-- **Configuration**: `/etc/holden/agent.conf` (customized for QM environment)
+### 2. pidfd Monitor (Main Partition)
+- **Direct control**: Receives pidfds and manages processes directly
+- **Poll-based monitoring**: Uses poll() on pidfds to detect process death
+- **Auto-restart**: Automatically respawns failed processes
+- **Process management**: Stop, restart, monitor all handled by monitor
 
-## Setup and Configuration
+## New Architecture Benefits
 
-### AIB Manifest Configuration
+### Safety & Reliability
+- **Stateless agent**: No agent state to corrupt or lose
+- **pidfd reliability**: Kernel-guaranteed process references
+- **Immediate detection**: poll() provides instant process death notification
+- **No race conditions**: pidfd eliminates PID reuse issues
 
-The `holden-demo.aib.yml` manifest configures:
+### Performance
+- **Minimal overhead**: Agent just spawns and passes reference
+- **Efficient monitoring**: poll() scales better than traditional approaches
+- **No periodic polling**: Event-driven process monitoring
 
-1. **Shared Filesystem Setup**:
-   ```yaml
-   add_files:
-     - path: /usr/lib/tmpfiles.d/holden_ipc.conf
-       text: |
-         D! /run/holden 0755 root root
-     - path: /etc/containers/systemd/qm.container.d/10-holden-ipc.conf
-       text: |
-         [Container]
-         Volume=/run/holden:/run/holden
-   ```
+### Security
+- **Least privilege**: Agent has minimal responsibilities
+- **fd passing security**: Secure pidfd transfer over Unix sockets
+- **Container isolation**: Processes inherit agent's container context
 
-2. **QM Agent Configuration**:
-   ```yaml
-   qm:
-     content:
-       add_files:
-         - path: /etc/holden/agent.conf
-           text: |
-             SOCKET_PATH=/run/holden/qm_orchestrator.sock
-             # ... other configuration
-   ```
+## Demo Flow
 
-3. **Systemd Service**:
-   ```yaml
-   systemd:
-     enabled_services:
-       - holden-agent
-   ```
+The demo demonstrates the complete lifecycle:
 
-## Running the Demo
+1. **Agent startup**: Stateless agent starts in QM partition
+2. **Process spawning**: Monitor requests agent to spawn processes
+3. **pidfd passing**: Agent returns pidfd references to monitor
+4. **Active monitoring**: Monitor polls pidfds for process events
+5. **Auto-restart**: Failed processes are automatically restarted
+6. **Graceful shutdown**: Monitor can cleanly stop all processes
 
-### 1. Build the AutoSD Image
+## Protocol
+
+### Agent Operations
+- `MSG_START_PROCESS`: Spawn process, return pidfd via fd passing
+- `MSG_PING`: Health check
+
+### Removed Operations (v0.1 legacy)
+- ~~`MSG_LIST_PROCESSES`~~: No agent state to list
+- ~~`MSG_STOP_PROCESS`~~: Monitor uses pidfd directly
+- ~~`MSG_APPLY_CONSTRAINTS`~~: Monitor applies constraints via pidfd
+
+## Files
+
+- `demo.sh`: Main demonstration script
+- `holden-demo.aib.yml`: AutoSD image builder configuration
+- `build.sh`: Demo VM image build script
+- `test.sh`: Quick functionality test
+
+## Usage
+
+### Quick Demo
+```bash
+./demo.sh
+```
+
+### Build Demo VM
 ```bash
 ./build.sh
 ```
 
-### 2. Launch the Demo
+### Test Functionality
 ```bash
-./demo.sh [ssh_port]
-```
-
-Default SSH port is 2222. The demo will:
-- Start the AutoSD VM
-- Verify QM partition mounting
-- Check holden package installation
-- Verify shared filesystem setup
-- Test holden-agent service status
-- Provide interactive commands
-
-### 3. Interactive Testing
-
-Once the demo is running, connect to the VM:
-```bash
-sshpass -ppassword ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -p 2222 root@localhost
-```
-
-## Demo Commands
-
-### Basic Process Management
-```bash
-# List processes managed by QM agent
-HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller list
-
-# Start processes in QM partition
-HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller start sleep 60
-HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller start ping -c 10 127.0.0.1
-
-# Monitor processes
-HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller monitor
-```
-
-### Resource Constraints (if cgroups available)
-```bash
-# Apply memory and CPU limits
-HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller constrain <pid> 50 25
-```
-
-### Process Cleanup
-```bash
-# Stop specific process
-HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller stop <pid>
-```
-
-### QM Partition Verification
-```bash
-# Check processes from QM perspective
-podman exec -ti qm ps aux
-
-# Check systemd service
-podman exec -ti qm systemctl status holden-agent
-```
-
-## Communication Protocol
-
-The system uses Unix domain sockets for secure, high-performance communication:
-
-- **Socket Path**: `/run/holden/qm_orchestrator.sock`
-- **Protocol**: Binary message-based
-- **Messages**: START_PROCESS, LIST_PROCESSES, STOP_PROCESS, APPLY_CONSTRAINTS
-- **Security**: Local-only communication, no network exposure
-
-## Features Demonstrated
-
-### ✅ Cross-Partition Process Management
-- Host controller managing QM partition processes
-- Secure communication via shared filesystem
-
-### ✅ Safety-Critical Architecture
-- QM partition isolation for quality-managed code
-- Systemd service management with proper lifecycle
-
-### ✅ Resource Management
-- cgroups v2 integration for memory/CPU constraints
-- Process monitoring and health checking
-
-### ✅ Automotive Compliance
-- AutoSD distribution compatibility
-- Quality Management partition support
-
-## Testing and Validation
-
-### Automated Tests
-```bash
-# Quick functionality test
 ./test.sh
 ```
 
-### Manual Verification
-1. **Service Status**: Verify holden-agent runs as systemd service
-2. **Socket Communication**: Test controller-agent communication
-3. **Process Isolation**: Confirm processes run in QM partition
-4. **Resource Constraints**: Apply and verify cgroups limits
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Agent Not Running**
-   - Check: `systemctl --root=/usr/share/qm/rootfs status holden-agent`
-   - Fix: Verify service is enabled in AIB manifest
-
-2. **Socket Not Found**
-   - Check: `ls -la /run/holden/`
-   - Fix: Verify shared filesystem configuration
-
-3. **Controller Connection Failed**
-   - Check: `HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller list`
-   - Fix: Ensure agent is running and socket exists
-
-4. **QM Partition Not Mounted**
-   - Check: `ls -la /usr/lib/qm/rootfs`
-   - Fix: Verify QM partition in AIB manifest
-
-### Debug Commands
-```bash
-# Check agent process
-podman exec -ti qm ps aux | grep holden
-
-# Verify socket permissions
-ls -la /run/holden/
-
-# Check systemd logs
-podman exec -ti qm journalctl -u holden-agent
-```
-
-## Security Considerations
-
-- **Local Communication**: Unix sockets provide secure local IPC
-- **Process Isolation**: QM partition provides safety-critical isolation
-- **No Network Exposure**: System operates entirely locally
-- **systemd Integration**: Proper service lifecycle management
-
 ## Requirements
 
-- **AutoSD 9 or later**
-- **cgroups v2 support** (for resource constraints)
-- **QM partition support**
-- **Root privileges** (for cgroups operations)
+- Linux with pidfd support (kernel 5.3+)
+- AutoSD or compatible container environment
+- SSH access to QM partition (for demo)
+
+## Migration from v0.1
+
+**Old Model (v0.1)**: Stateful agent with controller
+```bash
+controller start app     # Agent tracks PID internally
+controller list          # Agent returns its process list
+controller stop PID      # Agent kills tracked process
+```
+
+**New Model (v0.2)**: Stateless agent with pidfd monitor
+```bash
+pidfd_monitor app1 app2  # Agent spawns, returns pidfds
+# Monitor polls pidfds, handles all lifecycle management
+```
+
+The v0.2 architecture eliminates agent state management entirely, delegating all process control to the caller via pidfd references.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-*Named after 19th century puppeteer Joseph Holden, this system provides precise control over process lifecycles in automotive safety-critical environments.*
+This demo is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

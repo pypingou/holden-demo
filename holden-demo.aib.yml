@@ -1,4 +1,5 @@
-# Manifest file to demonstrate the use of the holden project
+# Manifest file to demonstrate the Holden Process Orchestration System v0.2
+# Showcases stateless agent with pidfd-based monitoring in AutoSD environment
 
 name: rpm_remote
 
