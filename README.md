@@ -1,6 +1,6 @@
 # Holden Process Orchestration Demo for AutoSD
 
-This demo showcases the **Holden Process Orchestration System v0.2** in an AutoSD (Automotive Safety Distribution) environment, demonstrating how a pidfd-based monitor running on the host partition can manage processes within the QM (Quality Management) partition using the stateless agent.
+This demo showcases the **Holden Process Orchestration System v0.2** in an AutoSD (Automotive Safety Distribution) environment, demonstrating how a pidfd-based orchestrator running on the host partition can manage processes within the QM (Quality Management) partition using the stateless agent.
 
 Named after 19th century puppeteer Joseph Holden, this system provides precise control over process lifecycles in safety-critical automotive environments using modern Linux pidfd technology.
 
@@ -16,7 +16,7 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 │  │         ASIL Processes            │    │                                    ││
 │  │                                   │    │                                    ││
 │  │  ┌─────────────────────────────┐  │    │  ┌─────────────────────────────┐   ││
-│  │  │    holden-pidfd-monitor     │  │    │  │       holden-agent          │   ││
+│  │  │    holden-orchestrator      │  │    │  │       holden-agent          │   ││
 │  │  │   ┌─────────────────────┐   │  │    │  │     ┌─────────────────┐     │   ││
 │  │  │   │ pidfd Management:   │   │  │    │  │     │ Stateless Spawn │     │   ││
 │  │  │   │ • Poll pidfds       │   │  │    │  │     │ • fork() + exec │     │   ││
@@ -45,7 +45,7 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 │                   │    │                  │  │  │ 123 │ │ 456 │ │ 789 │    │   ││
 │                   │    │                  │  │  └─────┘ └─────┘ └─────┘    │   ││
 │                   │    │                  │  │    ↑       ↑       ↑        │   ││
-│                   │    │                  │  │ [pidfd monitoring]          │   ││
+│                   │    │                  │  │ [pidfd orchestration]       │   ││
 │                   │    │                  │  └─────────────────────────────┘   ││
 │                   │    │                  │                                    ││
 │                   │    └──────────────────┘                                    ││
@@ -64,11 +64,11 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 - **fd passing**: Returns pidfd to caller via Unix socket
 - **Immediate cleanup**: Agent closes pidfd after passing it
 
-### 2. pidfd Monitor (Main Partition)
+### 2. pidfd Orchestrator (Main Partition)
 - **Direct control**: Receives pidfds and manages processes directly
 - **Poll-based monitoring**: Uses poll() on pidfds to detect process death
 - **Auto-restart**: Automatically respawns failed processes
-- **Process management**: Stop, restart, monitor all handled by monitor
+- **Process management**: Stop, restart, orchestration all handled by orchestrator
 
 ## New Architecture Benefits
 
@@ -93,11 +93,11 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 The demo demonstrates the complete lifecycle:
 
 1. **Agent startup**: Stateless agent starts in QM partition
-2. **Process spawning**: Monitor requests agent to spawn processes
-3. **pidfd passing**: Agent returns pidfd references to monitor
-4. **Active monitoring**: Monitor polls pidfds for process events
+2. **Process spawning**: Orchestrator requests agent to spawn processes
+3. **pidfd passing**: Agent returns pidfd references to orchestrator
+4. **Active orchestration**: Orchestrator polls pidfds for process events
 5. **Auto-restart**: Failed processes are automatically restarted
-6. **Graceful shutdown**: Monitor can cleanly stop all processes
+6. **Graceful shutdown**: Orchestrator can cleanly stop all processes
 
 ## Protocol
 
@@ -107,8 +107,8 @@ The demo demonstrates the complete lifecycle:
 
 ### Removed Operations (v0.1 legacy)
 - ~~`MSG_LIST_PROCESSES`~~: No agent state to list
-- ~~`MSG_STOP_PROCESS`~~: Monitor uses pidfd directly
-- ~~`MSG_APPLY_CONSTRAINTS`~~: Monitor applies constraints via pidfd
+- ~~`MSG_STOP_PROCESS`~~: Orchestrator uses pidfd directly
+- ~~`MSG_APPLY_CONSTRAINTS`~~: Orchestrator applies constraints via pidfd
 
 ## Files
 
@@ -149,10 +149,10 @@ controller list          # Agent returns its process list
 controller stop PID      # Agent kills tracked process
 ```
 
-**New Model (v0.2)**: Stateless agent with pidfd monitor
+**New Model (v0.2)**: Stateless agent with pidfd orchestrator
 ```bash
-pidfd_monitor app1 app2  # Agent spawns, returns pidfds
-# Monitor polls pidfds, handles all lifecycle management
+orchestrator app1 app2   # Agent spawns, returns pidfds
+# Orchestrator polls pidfds, handles all lifecycle management
 ```
 
 The v0.2 architecture eliminates agent state management entirely, delegating all process control to the caller via pidfd references.
