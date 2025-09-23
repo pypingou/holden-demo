@@ -183,7 +183,6 @@ HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock holden-controller stop <pid>
 ```bash
 # Check processes from QM perspective
 podman exec -ti qm ps aux
-podman exec -ti qm holden-controller list
 
 # Check systemd service
 podman exec -ti qm systemctl status holden-agent

@@ -174,7 +174,6 @@ echo "   HOLDEN_SOCKET_PATH=$QM_SOCKET holden-controller stop <pid>"
 echo ""
 echo -e "${GREEN}5. Check from QM perspective:${NC}"
 echo "   podman exec -ti qm ps aux"
-echo "   podman exec -ti qm holden-controller list"
 echo ""
 
 # Test a basic command to show it's working
