@@ -20,7 +20,7 @@ if [ $image = true ]; then
     build \
     --distro autosd9 \
     --target qemu \
-    --mode image \
+    --mode package \
     --build-dir=_build \
     --export image \
     holden-demo.aib.yml \
