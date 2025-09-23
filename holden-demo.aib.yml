@@ -2,6 +2,9 @@
 
 name: rpm_remote
 
+image:
+  selinux_mode: permissive
+
 content:
   repos:
     - id: holden
@@ -9,6 +12,8 @@ content:
   rpms:
     - vim-enhanced
     - holden
+    - strace
+    - dnf
     # For testing the image only:
     - openssh-server
     - openssh-clients
@@ -29,7 +34,7 @@ content:
         D! /run/holden 0755 root root
     - path: /etc/containers/systemd/qm.container.d/10-holden-ipc.conf
       text: |
-        # Mount shared IPC directory for Holden controller access
+        # Mount shared IPC directory for Holden socket access
         [Container]
         Volume=/run/holden:/run/holden
 
@@ -46,36 +51,24 @@ qm:
     rpms:
       - holden-agent
 
-    # Configure holden-agent to use shared socket directory
+    # Create systemd override directory
+    make_dirs:
+      - path: /etc/systemd/system/holden-agent.service.d
+        mode: 0755
+        parents: true
+
+    # Configure holden-agent systemd service override
     add_files:
-      - path: /etc/holden/agent.conf
+      - path: /etc/systemd/system/holden-agent.service.d/10-socket-path.conf
         text: |
-          # Holden Agent Configuration for QM partition
-          # Named after 19th century puppeteer Joseph Holden
-
-          # Socket path for agent communication (shared with host)
-          SOCKET_PATH=/run/holden/qm_orchestrator.sock
-
-          # Maximum number of processes to manage
-          MAX_PROCESSES=32
-
-          # Enable cgroups constraints (requires root)
-          ENABLE_CGROUPS=true
-
-          # cgroups base path in QM
-          CGROUP_BASE=/sys/fs/cgroup/holden_qm
-
-          # Log level (debug, info, warn, error)
-          LOG_LEVEL=info
-
-          # Process monitoring interval in seconds
-          MONITOR_INTERVAL=5
-
-          # Maximum restart attempts for failed processes
-          MAX_RESTART_ATTEMPTS=3
-
-          # Timeout for process operations (seconds)
-          PROCESS_TIMEOUT=30
+          # Override socket path and permissions for Holden agent
+          [Service]
+          Environment=HOLDEN_SOCKET_PATH=/run/holden/qm_orchestrator.sock
+          # Run as root for cgroups access and socket creation
+          User=root
+          Group=root
+          # Add /run/holden to writable paths
+          ReadWritePaths=/tmp /var/lib/holden /var/run/holden /sys/fs/cgroup /run/holden
 
     systemd:
       enabled_services:
