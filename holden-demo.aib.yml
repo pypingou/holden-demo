@@ -1,0 +1,91 @@
+# Manifest file to demonstrate the use of the holden project
+
+name: rpm_remote
+
+content:
+  repos:
+    - id: holden
+      baseurl: https://download.copr.fedorainfracloud.org/results/pingou/holden/centos-stream-9-$arch/
+  rpms:
+    - vim-enhanced
+    - holden
+    # For testing the image only:
+    - openssh-server
+    - openssh-clients
+
+  # Create shared directory for holden socket communication
+  make_dirs:
+    - path: /etc/containers/systemd/qm.container.d
+      mode: 0755
+      parents: true
+      exist_ok: true
+
+  # Configure shared socket directory via tmpfiles
+  add_files:
+    - path: /usr/lib/tmpfiles.d/holden_ipc.conf
+      text: |
+        # Holden Process Orchestration IPC directory
+        # Named after 19th century puppeteer Joseph Holden
+        D! /run/holden 0755 root root
+    - path: /etc/containers/systemd/qm.container.d/10-holden-ipc.conf
+      text: |
+        # Mount shared IPC directory for Holden controller access
+        [Container]
+        Volume=/run/holden:/run/holden
+
+  # Required for testing the image only:
+  systemd:
+    enabled_services:
+      # Enable ssh daemon
+      - sshd.service
+qm:
+  content:
+    repos:
+      - id: holden
+        baseurl: https://download.copr.fedorainfracloud.org/results/pingou/holden/centos-stream-9-$arch/
+    rpms:
+      - holden-agent
+
+    # Configure holden-agent to use shared socket directory
+    add_files:
+      - path: /etc/holden/agent.conf
+        text: |
+          # Holden Agent Configuration for QM partition
+          # Named after 19th century puppeteer Joseph Holden
+
+          # Socket path for agent communication (shared with host)
+          SOCKET_PATH=/run/holden/qm_orchestrator.sock
+
+          # Maximum number of processes to manage
+          MAX_PROCESSES=32
+
+          # Enable cgroups constraints (requires root)
+          ENABLE_CGROUPS=true
+
+          # cgroups base path in QM
+          CGROUP_BASE=/sys/fs/cgroup/holden_qm
+
+          # Log level (debug, info, warn, error)
+          LOG_LEVEL=info
+
+          # Process monitoring interval in seconds
+          MONITOR_INTERVAL=5
+
+          # Maximum restart attempts for failed processes
+          MAX_RESTART_ATTEMPTS=3
+
+          # Timeout for process operations (seconds)
+          PROCESS_TIMEOUT=30
+
+    systemd:
+      enabled_services:
+        - holden-agent
+
+
+auth:
+  # "password"
+  root_password: $6$xoLqEUz0cGGJRx01$H3H/bFm0myJPULNMtbSsOFd/2BnHqHkMD92Sfxd.EKM9hXTWSmELG8cf205l6dktomuTcgKGGtGDgtvHVXSWU.
+  # Required for testing the image only:
+  sshd_config:
+    PasswordAuthentication: true
+    PermitRootLogin: true
