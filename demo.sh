@@ -200,7 +200,7 @@ demo_pidfd_orchestrator() {
     info "Orchestrator commands: '/bin/sleep 3' (local) and '/bin/sleep 5' (agent)"
 
     # Run the process orchestrator with timeout to see it in action
-    ssh_cmd "timeout 15s holden-orchestrator '/bin/sleep 3' '/bin/sleep 5' 2>&1" || true
+    ssh_cmd "timeout 15s HOLDEN_SOCKET_PATH=$QM_SOCKET holden-orchestrator '/bin/sleep 3' '/bin/sleep 5' 2>&1" || true
 
     success "Process orchestrator demonstration completed"
 }
@@ -238,7 +238,7 @@ demo_pidfd_control() {
     echo ""
 
     log "Testing agent ping (only remaining agent operation)..."
-    ssh_cmd "echo 'Testing agent responsiveness...' && timeout 3s holden-orchestrator '/bin/true' '/bin/true' 2>&1 | head -5" || true
+    ssh_cmd "echo 'Testing agent responsiveness...' && timeout 3s HOLDEN_SOCKET_PATH=$QM_SOCKET holden-orchestrator '/bin/true' '/bin/true' 2>&1 | head -5" || true
 
     success "Direct pidfd control demonstrated"
 }
