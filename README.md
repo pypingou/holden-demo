@@ -7,59 +7,59 @@ Named after 19th century puppeteer Joseph Holden, this system provides precise c
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                               AutoSD Host System                                       │
-│                                                                                         │
-│  ┌────────────────────────────────┐              ┌─────────────────────────────────┐  │
-│  │        Main Partition          │              │         QM Partition            │  │
-│  │     (Safety Critical)          │              │   (Quality Managed/Non-Safety)  │  │
-│  │                                │              │                                 │  │
-│  │  ┌──────────────────────────┐  │              │  ┌───────────────────────────┐  │  │
-│  │  │   holden-orchestrator    │  │              │  │      holden-agent         │  │  │
-│  │  │                          │  │              │  │                           │  │  │
-│  │  │ ┌─────────┬─────────────┐│  │              │  │ ┌─────────────────────────┐│  │  │
-│  │  │ │Local    │Agent        ││  │   Socket     │  │ │   Stateless Agent       ││  │  │
-│  │  │ │Process  │Process      ││  │ ◄──────────► │  │ │                         ││  │  │
-│  │  │ │         │             ││  │   + fd       │  │ │ 1. Receive command      ││  │  │
-│  │  │ │fork()   │spawn via    ││  │   passing    │  │ │ 2. fork() + exec()      ││  │  │
-│  │  │ │pidfd    │agent        ││  │              │  │ │ 3. pidfd_open(child)    ││  │  │
-│  │  │ │         │get pidfd    ││  │              │  │ │ 4. send_fd(pidfd)       ││  │  │
-│  │  │ └─────────┴─────────────┘│  │              │  │ │ 5. close(pidfd)         ││  │  │
-│  │  │                          │  │              │  │ │                         ││  │  │
-│  │  │ ┌─────────────────────────┐│  │              │  │ No state maintained     ││  │  │
-│  │  │ │   Event Loop:           ││  │              │  │ No process tracking     ││  │  │
-│  │  │ │                         ││  │              │  │ No lifecycle mgmt       ││  │  │
-│  │  │ │ poll(local_pidfd,       ││  │              │  │                         ││  │  │
-│  │  │ │      agent_pidfd)       ││  │              │  └─────────────────────────┘│  │  │
-│  │  │ │                         ││  │              │                             │  │  │
-│  │  │ │ if process dies:        ││  │              │  QM Child Process:          │  │  │
-│  │  │ │   restart immediately   ││  │              │  ┌─────────────────────────┐│  │  │
-│  │  │ │                         ││  │              │  │ PID: 789                ││  │  │
-│  │  │ │ Restart count: N        ││  │              │  │ Context: QM container   ││  │  │
-│  │  │ └─────────────────────────┘│  │              │  │ Managed via: pidfd      ││  │  │
-│  │  └──────────────────────────────┘  │              │  │ (from Main partition)   ││  │  │
-│  │                                │  │              │  └─────────────────────────┘│  │  │
-│  │  Local Child Process:         │  │              │                             │  │  │
-│  │  ┌─────────────────────────┐  │  │              │  ┌───────────────────────────┐│  │  │
-│  │  │ PID: 456                │  │  │              │  │       systemd             ││  │  │
-│  │  │ Context: Main partition │  │  │              │  │ ┌───────────────────────┐ ││  │  │
-│  │  │ Managed via: pidfd      │  │  │              │  │ │ holden-agent.service  │ ││  │  │
-│  │  └─────────────────────────┘  │  │              │  │ │ • Auto-start agent    │ ││  │  │
-│  └────────────────────────────────┘  │              │  │ │ • Restart on failure │ ││  │  │
-│                                       │              │  │ │ • Security sandbox   │ ││  │  │
-│                                       │              │  │ └───────────────────────┘ ││  │  │
-│                                       │              │  └───────────────────────────┘│  │  │
-│                                       │              └─────────────────────────────────┘  │
-│                                       │                                                    │
-│ Key Advantages:                       │                                                    │
-│ • Event-driven monitoring (no polls) │                                                    │
-│ • Immediate death detection          │                                                    │
-│ • Cross-partition process control    │                                                    │
-│ • Agent reliability (stateless)      │                                                    │
-│ • No zombie processes (pidfd cleanup)│                                                    │
-│                                       │                                                    │
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                               AutoSD Host System                                         │
+│                                                                                          │
+│  ┌──────────────────────────────────┐              ┌──────────────────────────────────┐  │
+│  │        Main Partition            │              │         QM Partition             │  │
+│  │     (Safety Critical)            │              │   (Quality Managed/Non-Safety)   │  │
+│  │                                  │              │                                  │  │
+│  │  ┌────────────────────────────┐  │              │  ┌────────────────────────────┐  │  │
+│  │  │   holden-orchestrator      │  │              │  │      holden-agent          │  │  │
+│  │  │                            │  │              │  │                            │  │  │
+│  │  │ ┌───────────────────────┐  │  │              │  │                            │  │  │
+│  │  │ │Local Process          │  │  │   Socket     │  │    Stateless Agent         │  │  │
+│  │  │ │                       │  │◄──────────────────►│                            │  │  │
+│  │  │ │                       │  │  │   + fd       │  │  1. Receive command        │  │  │
+│  │  │ │fork()   │spawns via   │  │  │   passing    │  │  2. fork() + exec()        │  │  │
+│  │  │ │pidfd    │the agent    │  │  │              │  │  3. pidfd_open(child)      │  │  │
+│  │  │ │         │gets pidfd   │  │  │              │  │  4. send_fd(pidfd)         │  │  │
+│  │  │ └─────────┴─────────────┘  │  │              │  │  5. close(pidfd)           │  │  │
+│  │  │                            │  │              │  │                            │  │  │
+│  │  │ ┌─────────────────────────┐│  │              │  │ No state maintained        │  │  │
+│  │  │ │   Event Loop:           ││  │              │  │ No process tracking        │  │  │
+│  │  │ │                         ││  │              │  │ No lifecycle mgmt          │  │  │
+│  │  │ │ poll(local_pidfd,       ││  │              │  │                            │  │  │
+│  │  │ │      agent_pidfd)       ││  │              │  └────────────────────────────┘  │  │
+│  │  │ │                         ││  │              │                                  │  │
+│  │  │ │ if process dies:        ││  │              │  QM Child Process:               │  │
+│  │  │ │   restart immediately   ││  │              │  ┌─────────────────────────┐     │  │
+│  │  │ │                         ││  │              │  │ PID: 789                │     │  │
+│  │  │ │ Restart count: N        ││  │              │  │ Context: QM container   │     │  │
+│  │  │ └─────────────────────────┘│  │              │  │ Managed via: pidfd      │     │  │
+│  │  └────────────────────────────┘  │              │  │ (from Main partition)   │     │  │
+│  │                                  │              │  └─────────────────────────┘     │  │
+│  │  Local Child Process:            │              │                                  │  │
+│  │  ┌─────────────────────────┐     │              │  ┌───────────────────────────┐   │  │
+│  │  │ PID: 456                │     │              │  │       systemd             │   │  │
+│  │  │ Context: Main partition │     │              │  │ ┌───────────────────────┐ │   │  │
+│  │  │ Managed via: pidfd      │     │              │  │ │ holden-agent.service  │ │   │  │
+│  │  └─────────────────────────┘     │              │  │ │ • Auto-start agent    │ │   │  │
+│  └──────────────────────────────────┘              │  │ │ • Restart on failure  │ │   │  │
+│                                                    │  │ │ • Security sandbox    │ │   │  │
+│                                                    │  │ └───────────────────────┘ │   │  │
+│                                                    │  └───────────────────────────┘   │  │
+│                                                    └──────────────────────────────────┘  │
+│                                                                                          │
+│ Key Advantages:                                                                          │
+│ • Event-driven monitoring (no polls)                                                     │
+│ • Immediate death detection                                                              │
+│ • Cross-partition process control                                                        │
+│ • Agent reliability (stateless)                                                          │
+│ • No zombie processes (pidfd cleanup)                                                    │
+│                                                                                          │
 │ Communication: Unix Socket (/run/holden/qm_orchestrator.sock) + fd passing               │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Components
